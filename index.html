@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="予暖">
+<meta name="theme-color" content="#E8537A">
+<title>予暖 - 经期追踪</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+/* ===== 全局样式 ===== */
+:root {
+  --primary: #E8537A;
+  --primary-light: #F8A4C0;
+  --primary-pale: #FCE4EC;
+  --menstrual: #E8537A;
+  --menstrual-light: #FCE4EC;
+  --follicular: #6DD5B8;
+  --follicular-light: #E8F5E9;
+  --ovulation: #FF8C69;
+  --ovulation-light: #FFF3E0;
+  --luteal: #7E57C2;
+  --luteal-light: #F3E5F5;
+  --bg: #FDF2F6;
+  --surface: #FFFFFF;
+  --surface-secondary: #FAFAFA;
+  --text-primary: #333333;
+  --text-secondary: #999999;
+  --text-tertiary: #CCCCCC;
+  --border: #F0F0F0;
+  --safe: #6DD5B8;
+  --warning: #FFB74D;
+  --tab-height: 56px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  padding-bottom: calc(var(--tab-height) + var(--safe-bottom));
+  min-height: 100vh;
+}
+
+/* ===== Tab 导航 ===== */
+.tab-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: calc(var(--tab-height) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: var(--surface);
+  display: flex;
+  border-top: 1px solid var(--border);
+  z-index: 100;
+  box-shadow: 0 -1px 6px rgba(0,0,0,0.03);
+}
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  transition: color 0.2s;
+  border: none; background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-item.active { color: var(--primary); }
+.tab-item svg { width: 24px; height: 24px; }
+.tab-item.record-btn svg { width: 44px; height: 44px; margin-top: -20px; }
+.tab-item.record-btn .tab-label { margin-top: -2px; }
+
+/* ===== 页面容器 ===== */
+.page { display: none; padding: 16px; padding-top: 12px; }
+.page.active { display: block; }
+.page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 4px 12px;
+}
+.page-title {
+  font-size: 26px; font-weight: 700; color: var(--primary);
+}
+
+/* ===== 卡片 ===== */
+.card {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(232,83,122,0.06);
+}
+.card-title {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+/* ===== 环形进度条（SVG） ===== */
+.ring-container {
+  display: flex; justify-content: center; padding: 12px 0;
+}
+.ring-wrapper { position: relative; width: 200px; height: 200px; }
+.ring-svg { transform: rotate(-90deg); }
+.ring-center {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+.ring-label { font-size: 14px; color: var(--text-secondary); }
+.ring-day { font-size: 32px; font-weight: 700; }
+.ring-total { font-size: 13px; color: var(--text-tertiary); }
+
+/* ===== 今日状态卡片 ===== */
+.status-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+}
+.status-dot { width: 10px; height: 10px; border-radius: 50%; }
+.status-phase { font-size: 20px; font-weight: 700; }
+.status-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  text-align: center; gap: 8px;
+}
+.status-grid .val { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.status-grid .lbl { font-size: 12px; color: var(--text-secondary); }
+.status-grid .col { padding: 8px 0; }
+
+/* ===== 快捷记录按钮 ===== */
+.record-btn-big {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 16px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white; font-size: 16px; font-weight: 600;
+  border: none; border-radius: 16px;
+  cursor: pointer; margin-bottom: 16px;
+}
+
+/* ===== 日历 ===== */
+.cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0 12px;
+}
+.cal-month { font-size: 18px; font-weight: 700; }
+.cal-nav {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 16px; color: var(--primary); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  text-align: center; font-size: 13px; font-weight: 500;
+  color: var(--text-secondary); padding: 6px 0;
+}
+.weekdays span:first-child,
+.weekdays span:last-child { color: var(--primary); }
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal-cell {
+  aspect-ratio: 1;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; border-radius: 50%;
+  cursor: pointer; position: relative;
+  color: var(--text-primary);
+}
+.cal-cell.other-month { color: var(--text-tertiary); }
+.cal-cell.today { background: var(--primary); color: white; font-weight: 700; }
+.cal-cell.period { background: var(--menstrual); color: white; }
+.cal-cell.predicted {
+  background: var(--menstrual-light);
+  color: var(--primary);
+  border: 2px solid var(--primary-light);
+}
+.cal-cell.ovulation {
+  background: var(--ovulation-light);
+  color: var(--ovulation);
+  border: 2px solid var(--ovulation);
+}
+.legend { display: flex; gap: 14px; padding: 10px 0; font-size: 11px; color: var(--text-secondary); }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+.legend-dot.p { background: var(--menstrual); }
+.legend-dot.pp { background: var(--menstrual-light); border: 2px solid var(--primary-light); }
+.legend-dot.o { background: var(--ovulation-light); border: 2px solid var(--ovulation); }
+
+/* ===== 记录页面 ===== */
+.section-label {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  padding: 4px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.section-label .icon-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+
+/* 经期开关 */
+.toggle-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface); border-radius: 12px; margin-bottom: 4px;
+}
+.toggle-icon {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.toggle-info { flex: 1; }
+.toggle-info .t-title { font-size: 15px; font-weight: 500; }
+.toggle-info .t-sub { font-size: 12px; color: var(--text-secondary); }
+.toggle-switch {
+  width: 51px; height: 31px; border-radius: 16px;
+  background: var(--border); position: relative; cursor: pointer;
+  transition: background 0.2s;
+}
+.toggle-switch.on { background: var(--primary); }
+.toggle-switch::after {
+  content: ''; position: absolute;
+  width: 27px; height: 27px; border-radius: 50%;
+  background: white; top: 2px; left: 2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+.toggle-switch.on::after { transform: translateX(20px); }
+
+/* 经血量 */
+.flow-picker { display: flex; gap: 8px; }
+.flow-btn {
+  flex: 1; padding: 14px 8px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface);
+  text-align: center; font-size: 13px; cursor: pointer;
+  transition: all 0.15s;
+}
+.flow-btn.selected {
+  border-color: var(--menstrual); background: var(--menstrual-light);
+  color: var(--menstrual); font-weight: 600;
+  border-width: 2px;
+}
+.flow-btn .flow-icon { font-size: 18px; display: block; margin-bottom: 4px; }
+
+/* 症状标签网格 */
+.tag-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+}
+.tag-btn {
+  padding: 10px 4px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 12px; cursor: pointer; text-align: center;
+  transition: all 0.15s; color: var(--text-secondary);
+}
+.tag-btn.selected {
+  border-color: var(--primary); background: var(--primary-pale);
+  color: var(--primary); font-weight: 600;
+}
+
+/* 情绪 */
+.mood-picker { display: flex; gap: 8px; }
+.mood-btn {
+  flex: 1; padding: 12px 4px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface);
+  text-align: center; font-size: 12px; cursor: pointer;
+  transition: all 0.15s; color: var(--text-secondary);
+}
+.mood-btn.selected {
+  border-color: var(--primary); background: var(--primary-pale);
+  color: var(--primary); font-weight: 600; border-width: 2px;
+}
+.mood-btn .mood-emoji { font-size: 26px; display: block; margin-bottom: 4px; }
+
+/* 备注 */
+.note-area {
+  width: 100%; min-height: 80px; padding: 12px;
+  border: 1px solid var(--border); border-radius: 10px;
+  font-size: 14px; font-family: inherit; resize: vertical;
+  background: var(--surface-secondary);
+}
+
+/* 保存按钮 */
+.save-btn {
+  width: 100%; padding: 16px; border: none; border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white; font-size: 16px; font-weight: 600; cursor: pointer;
+  margin-top: 4px;
+}
+
+/* 个人中心 */
+.profile-avatar {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px; margin: 20px auto 8px;
+}
+.profile-name { text-align: center; font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.profile-sub { text-align: center; font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+
+.stats-row { display: flex; gap: 12px; }
+.stat-mini {
+  flex: 1; text-align: center; padding: 14px 8px;
+  background: var(--surface); border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(232,83,122,0.04);
+}
+.stat-mini .val { font-size: 18px; font-weight: 700; }
+.stat-mini .lbl { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+.menu-list { background: var(--surface); border-radius: 16px; overflow: hidden; margin-top: 16px; }
+.menu-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px; border-bottom: 1px solid var(--border);
+  font-size: 15px; cursor: pointer;
+}
+.menu-row:last-child { border-bottom: none; }
+.menu-row .arrow { margin-left: auto; color: var(--text-tertiary); font-size: 14px; }
+
+/* 设置面板 */
+.settings-panel {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg); z-index: 200; padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  display: none; overflow-y: auto;
+}
+.settings-panel.active { display: block; }
+.settings-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 16px;
+}
+.settings-header h3 { font-size: 18px; }
+.settings-group {
+  background: var(--surface); border-radius: 16px; padding: 16px; margin-bottom: 16px;
+}
+.settings-group h4 { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0;
+}
+.setting-row label { font-size: 15px; }
+.setting-row input[type="range"] { width: 120px; accent-color: var(--primary); }
+.setting-row .val { font-size: 15px; font-weight: 600; color: var(--primary); min-width: 40px; text-align: right; }
+.setting-row select {
+  font-size: 14px; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+/* Toast */
+.toast {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: white; border-radius: 20px; padding: 24px 32px;
+  text-align: center; z-index: 300; box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  display: none;
+}
+.toast.show { display: block; animation: toastIn 0.3s ease; }
+.toast .check { font-size: 48px; color: var(--safe); margin-bottom: 8px; }
+.toast .msg { font-size: 16px; font-weight: 600; }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+
+/* 分割线 */
+.divider { height: 1px; background: var(--border); margin: 8px 0; }
+.mt-12 { margin-top: 12px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.text-secondary { color: var(--text-secondary); font-size: 13px; }
+
+/* 提示卡片 */
+.tip-card { display: flex; gap: 12px; }
+.tip-card .tip-icon { font-size: 20px; flex-shrink: 0; }
+.tip-card .tip-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<!-- ========== Toast ========== -->
+<div class="toast" id="toast">
+  <div class="check">✅</div>
+  <div class="msg">保存成功</div>
+</div>
+
+<!-- ========== 首页 ========== -->
+<div class="page active" id="page-dashboard">
+  <div class="page-header">
+    <div>
+      <div class="page-title">予暖</div>
+      <div class="text-secondary">少爷和你一起在乎你 ❤️</div>
+    </div>
+  </div>
+  <div class="ring-container">
+    <div class="ring-wrapper">
+      <svg class="ring-svg" width="200" height="200" viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="88" fill="none" stroke="#FCE4EC" stroke-width="16"/>
+        <circle id="ring-progress" cx="100" cy="100" r="88" fill="none" stroke="#E8537A" stroke-width="16" stroke-linecap="round" stroke-dasharray="0" stroke-dashoffset="0"/>
+      </svg>
+      <div class="ring-center">
+        <div class="ring-label" id="ring-label">周期</div>
+        <div class="ring-day" id="ring-day" style="color:#E8537A">第0天</div>
+        <div class="ring-total" id="ring-total">共28天</div>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:8px">
+    <div class="status-row">
+      <div class="status-dot" id="status-dot" style="background:var(--follicular)"></div>
+      <div class="status-phase" id="status-phase">卵泡期</div>
+    </div>
+    <div class="divider mb-12"></div>
+    <div class="status-grid">
+      <div class="col"><div class="val" id="days-until">--</div><div class="lbl">天后</div></div>
+      <div class="col"><div class="val" id="preg-prob" style="color:var(--safe)">低</div><div class="lbl">怀孕概率</div></div>
+      <div class="col"><div class="val" id="next-period" style="font-size:15px">--</div><div class="lbl">预计经期</div></div>
+    </div>
+    <div class="divider mt-12 mb-12"></div>
+    <div id="ovulation-info" class="text-secondary"></div>
+  </div>
+  <div class="card tip-card">
+    <div class="tip-icon">💡</div>
+    <div class="tip-text" id="daily-tip">正在加载...</div>
+  </div>
+  <button class="record-btn-big" onclick="openRecord()">📝 记录今天</button>
+</div>
+
+<!-- ========== 日历 ========== -->
+<div class="page" id="page-calendar">
+  <div class="cal-header">
+    <button class="cal-nav" onclick="prevMonth()">◀</button>
+    <div class="cal-month" id="cal-month">2026年7月</div>
+    <button class="cal-nav" onclick="nextMonth()">▶</button>
+  </div>
+  <div class="weekdays"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot p"></div>经期</div>
+    <div class="legend-item"><div class="legend-dot pp"></div>预测经期</div>
+    <div class="legend-item"><div class="legend-dot o"></div>排卵期</div>
+  </div>
+  <button class="record-btn-big" onclick="openRecord()" style="margin-top:8px">📝 记录今天</button>
+</div>
+
+<!-- ========== 记录 ========== -->
+<div class="page" id="page-record">
+  <div class="page-header">
+    <div style="font-size:17px;font-weight:600" id="record-date-title">2026年7月19日</div>
+    <div class="text-secondary" id="record-weekday">星期六</div>
+  </div>
+
+  <div class="section-label mb-8"><span class="icon-dot" style="background:var(--menstrual)"></span>经期状态</div>
+  <div class="toggle-row">
+    <div class="toggle-icon" style="background:var(--menstrual-light);color:var(--menstrual)">🔴</div>
+    <div class="toggle-info"><div class="t-title">经期开始</div><div class="t-sub">标记今天为经期第一天</div></div>
+    <div class="toggle-switch" id="period-start-toggle" onclick="toggleSwitch(this)"></div>
+  </div>
+  <div class="toggle-row" style="margin-bottom:16px">
+    <div class="toggle-icon" style="background:var(--primary-pale);color:var(--primary)">⭕</div>
+    <div class="toggle-info"><div class="t-title">经期结束</div><div class="t-sub">标记经期已经结束</div></div>
+    <div class="toggle-switch" id="period-end-toggle" onclick="toggleSwitch(this)"></div>
+  </div>
+
+  <div class="section-label mb-8"><span class="icon-dot" style="background:var(--menstrual)"></span>经血量</div>
+  <div class="flow-picker mb-16">
+    <div class="flow-btn" data-flow="0" onclick="selectFlow(this)"><span class="flow-icon">💧</span>点滴</div>
+    <div class="flow-btn" data-flow="1" onclick="selectFlow(this)"><span class="flow-icon">💧</span>少量</div>
+    <div class="flow-btn" data-flow="2" onclick="selectFlow(this)"><span class="flow-icon">💧💧</span>中量</div>
+    <div class="flow-btn" data-flow="3" onclick="selectFlow(this)"><span class="flow-icon">💧💧💧</span>大量</div>
+  </div>
+
+  <div class="section-label mb-8"><span class="icon-dot" style="background:var(--warning)"></span>身体症状（多选）</div>
+  <div class="tag-grid mb-16" id="symptom-tags"></div>
+
+  <div class="section-label mb-8"><span class="icon-dot" style="background:var(--ovulation)"></span>今日情绪</div>
+  <div class="mood-picker mb-16" id="mood-picker"></div>
+
+  <div class="section-label mb-8"><span class="icon-dot" style="background:var(--luteal)"></span>其他记录</div>
+  <div class="toggle-row mb-8">
+    <div class="toggle-icon" style="background:var(--primary-pale);color:var(--primary)">💕</div>
+    <div class="toggle-info"><div class="t-title">爱爱</div><div class="t-sub">记录今天是否有性生活</div></div>
+    <div class="toggle-switch" id="sex-toggle" onclick="toggleSwitch(this)"></div>
+  </div>
+  <div class="mb-8">
+    <div class="section-label mb-8" style="padding:0">备注</div>
+    <textarea class="note-area" id="record-note" placeholder="记录今天的感受..."></textarea>
+  </div>
+
+  <button class="save-btn" onclick="saveRecord()">💾 保存记录</button>
+  <div style="text-align:center;padding:12px">
+    <span style="color:var(--text-secondary);font-size:14px;cursor:pointer" onclick="clearRecord()">清除全部</span>
+  </div>
+</div>
+
+<!-- ========== 我的 ========== -->
+<div class="page" id="page-profile">
+  <div class="profile-avatar" id="profile-avatar">🐶</div>
+  <div class="profile-name" id="profile-name">予暖用户</div>
+  <div class="profile-sub" id="profile-sub">已记录 0 个周期</div>
+
+  <div class="stats-row">
+    <div class="stat-mini"><div class="val" id="stat-avg-cycle" style="color:var(--primary)">28天</div><div class="lbl">平均周期</div></div>
+    <div class="stat-mini"><div class="val" id="stat-avg-period" style="color:var(--menstrual)">5天</div><div class="lbl">经期持续</div></div>
+    <div class="stat-mini"><div class="val" id="stat-regularity" style="color:var(--safe)">暂无</div><div class="lbl">规律性</div></div>
+  </div>
+
+  <div class="menu-list">
+    <div class="menu-row" onclick="openSettings()">📊 数据统计<span class="arrow">›</span></div>
+    <div class="menu-row" onclick="openSettings()">⚙️ 设置<span class="arrow">›</span></div>
+    <div class="menu-row" onclick="showAbout()">💖 关于予暖<span class="arrow">›</span></div>
+  </div>
+  <div style="text-align:center;padding:24px;font-size:12px;color:var(--text-tertiary)">
+    予暖 v1.0.0 · 少爷和你一起在乎你 ❤️
+  </div>
+</div>
+
+<!-- ========== 设置面板 ========== -->
+<div class="settings-panel" id="settings-panel">
+  <div class="settings-header">
+    <button class="cal-nav" onclick="closeSettings()">✕</button>
+    <h3>设置</h3>
+    <button style="border:none;background:none;color:var(--primary);font-size:15px;font-weight:600;cursor:pointer" onclick="saveSettings()">保存</button>
+  </div>
+  <div class="settings-group">
+    <h4>个人信息</h4>
+    <div class="setting-row">
+      <label>昵称</label>
+      <input type="text" id="set-nickname" placeholder="你的昵称" style="font-size:14px;padding:6px;border:1px solid var(--border);border-radius:8px;text-align:right;width:140px">
+    </div>
+  </div>
+  <div class="settings-group">
+    <h4>周期设置</h4>
+    <div class="setting-row">
+      <label>平均周期</label>
+      <input type="range" id="set-cycle" min="20" max="45" value="28" oninput="updateSlider(this,'set-cycle-val')">
+      <span class="val" id="set-cycle-val">28天</span>
+    </div>
+    <div class="setting-row">
+      <label>经期持续</label>
+      <input type="range" id="set-period" min="2" max="10" value="5" oninput="updateSlider(this,'set-period-val')">
+      <span class="val" id="set-period-val">5天</span>
+    </div>
+    <div class="setting-row">
+      <label>使用模式</label>
+      <select id="set-mode">
+        <option value="standard">标准模式</option>
+        <option value="pregnancy">备孕模式</option>
+      </select>
+    </div>
+  </div>
+  <div class="settings-group">
+    <h4>数据统计</h4>
+    <div id="stats-content" style="font-size:14px;line-height:2">
+      <div>记录周期数：<strong id="stat-cycles">0 个</strong></div>
+      <div>平均周期：<strong id="stat-avg-c">28 天</strong></div>
+      <div>平均经期：<strong id="stat-avg-p">5 天</strong></div>
+      <div>最短周期：<strong id="stat-min">-- 天</strong></div>
+      <div>最长周期：<strong id="stat-max">-- 天</strong></div>
+      <div>规律性：<strong id="stat-reg">暂无数据</strong></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== Tab 导航 ========== -->
+<div class="tab-bar">
+  <button class="tab-item active" onclick="switchTab(0)" id="tab-0">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+    <span class="tab-label">首页</span>
+  </button>
+  <button class="tab-item" onclick="switchTab(1)" id="tab-1">
+    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/><line x1="8" y1="3" x2="8" y2="7" stroke="currentColor" stroke-width="2"/><line x1="16" y1="3" x2="16" y2="7" stroke="currentColor" stroke-width="2"/></svg>
+    <span class="tab-label">日历</span>
+  </button>
+  <button class="tab-item record-btn" onclick="openRecord()" id="tab-2">
+    <svg viewBox="0 0 44 44" fill="currentColor"><circle cx="22" cy="22" r="20" fill="#E8537A"/><line x1="22" y1="14" x2="22" y2="30" stroke="white" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="22" x2="30" y2="22" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+    <span class="tab-label" style="color:var(--primary)">记录</span>
+  </button>
+  <button class="tab-item" onclick="switchTab(3)" id="tab-3">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+    <span class="tab-label">我的</span>
+  </button>
+</div>
+
+<script>
+// ===== 数据层 =====
+const SYMPTOMS = [
+  {id:'cramps',name:'痛经',icon:'😣'},
+  {id:'backache',name:'腰酸',icon:'🧎'},
+  {id:'breastTenderness',name:'乳房胀痛',icon:'💗'},
+  {id:'headache',name:'头痛',icon:'🤕'},
+  {id:'diarrhea',name:'拉肚子',icon:'🚽'},
+  {id:'constipation',name:'便秘',icon:'😫'},
+  {id:'nausea',name:'恶心',icon:'🤢'},
+  {id:'appetiteChange',name:'食欲变化',icon:'🍽️'},
+  {id:'fatigue',name:'疲劳',icon:'😴'},
+  {id:'insomnia',name:'失眠',icon:'🌙'},
+  {id:'chills',name:'怕冷',icon:'🥶'},
+  {id:'bloating',name:'浮肿',icon:'🫃'},
+  {id:'acne',name:'长痘',icon:'🔴'},
+  {id:'discharge',name:'白带异常',icon:'🩲'}
+];
+const MOODS = [
+  {id:'happy',name:'开心',emoji:'😊'},
+  {id:'calm',name:'平静',emoji:'😐'},
+  {id:'anxious',name:'焦虑',emoji:'😰'},
+  {id:'irritable',name:'烦躁',emoji:'😡'},
+  {id:'sad',name:'难过',emoji:'😢'}
+];
+const FLOW_LEVELS = ['点滴','少量','中量','大量'];
+const FLOW_ICONS = ['💧','💧','💧💧','💧💧💧'];
+
+const PHASES = {
+  menstrual: { name:'经期', color:'#E8537A', dot:'#E8537A', desc:'大姨妈来访中，注意保暖休息哦', preg:'极低', tip:'💡 多喝温水，避免生冷食物，适当休息。可以热敷腹部缓解不适。' },
+  follicular: { name:'卵泡期', color:'#6DD5B8', dot:'#6DD5B8', desc:'身体状态不错，适合运动', preg:'低', tip:'💡 新陈代谢加快，是减重和运动的好时机。皮肤状态也在变好哦～' },
+  ovulation: { name:'排卵期', color:'#FF8C69', dot:'#FF8C69', desc:'处于易孕期，卵子等待中', preg:'高', tip:'💡 受孕几率最高的时期。注意营养均衡，保持心情愉快。' },
+  luteal: { name:'黄体期', color:'#7E57C2', dot:'#7E57C2', desc:'黄体期，可能会有经前症状', preg:'低', tip:'💡 可能会出现乳房胀痛、情绪波动。减少咖啡因，多吃含镁食物。' }
+};
+
+function getStore() {
+  let d = localStorage.getItem('yunnuan_data');
+  return d ? JSON.parse(d) : { records:{}, settings:{ avgCycleDays:28, avgPeriodDays:5, lutealDays:14, nickname:'', mode:'standard' } };
+}
+function setStore(data) { localStorage.setItem('yunnuan_data', JSON.stringify(data)); }
+
+function dateKey(d) {
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+let currentTab = 0;
+let recordDate = new Date();
+let calYear, calMonth;
+const today = new Date(); today.setHours(0,0,0,0);
+
+// ===== 初始化 =====
+function init() {
+  // 首次生成示例数据
+  const data = getStore();
+  if (Object.keys(data.records).length === 0) generateSampleData();
+
+  // 渲染症状标签
+  const tagGrid = document.getElementById('symptom-tags');
+  SYMPTOMS.forEach(s => {
+    const btn = document.createElement('div');
+    btn.className = 'tag-btn';
+    btn.dataset.id = s.id;
+    btn.innerHTML = `${s.icon} ${s.name}`;
+    btn.onclick = function() { this.classList.toggle('selected'); };
+    tagGrid.appendChild(btn);
+  });
+
+  // 渲染情绪
+  const moodPicker = document.getElementById('mood-picker');
+  MOODS.forEach(m => {
+    const btn = document.createElement('div');
+    btn.className = 'mood-btn';
+    btn.dataset.id = m.id;
+    btn.innerHTML = `<span class="mood-emoji">${m.emoji}</span>${m.name}`;
+    btn.onclick = function() {
+      moodPicker.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+      this.classList.add('selected');
+    };
+    moodPicker.appendChild(btn);
+  });
+
+  calYear = today.getFullYear();
+  calMonth = today.getMonth();
+  refreshAll();
+}
+
+function generateSampleData() {
+  const data = getStore();
+  const periods = [
+    { start: -85, len: 5 },
+    { start: -56, len: 6 },
+    { start: -28, len: 5 },
+  ];
+  periods.forEach(p => {
+    const sd = new Date(today); sd.setDate(sd.getDate() + p.start);
+    data.records[dateKey(sd)] = { isPeriodStart:true, isPeriodEnd:false, flowLevel:2, symptoms:['cramps','fatigue'], mood:'irritable', hadSex:false, note:'' };
+    for (let i=1; i<p.len; i++) {
+      const d = new Date(sd); d.setDate(d.getDate()+i);
+      data.records[dateKey(d)] = { isPeriodStart:false, isPeriodEnd:false, flowLevel:i<3?2:1, symptoms:i===1?['cramps']:[], mood:'calm', hadSex:false, note:'' };
+    }
+    const ed = new Date(sd); ed.setDate(ed.getDate()+p.len);
+    data.records[dateKey(ed)] = { isPeriodStart:false, isPeriodEnd:true, flowLevel:0, symptoms:[], mood:'happy', hadSex:false, note:'' };
+  });
+  setStore(data);
+}
+
+// ===== 计算引擎 =====
+function getPeriodStarts() {
+  const data = getStore();
+  const starts = [];
+  Object.entries(data.records).forEach(([k, r]) => {
+    if (r.isPeriodStart) starts.push(new Date(k));
+  });
+  starts.sort((a,b) => a-b);
+  return starts;
+}
+
+function calcAvgCycle(starts) {
+  if (starts.length < 2) return 28;
+  let sum = 0;
+  for (let i=1; i<starts.length; i++) {
+    sum += (starts[i] - starts[i-1]) / (1000*60*60*24);
+  }
+  return Math.round(sum / (starts.length-1));
+}
+
+function calcAvgPeriod(starts) {
+  const data = getStore();
+  if (starts.length === 0) return 5;
+  let sum = 0, count = 0;
+  starts.forEach(s => {
+    const ends = Object.entries(data.records).filter(([k,r]) => r.isPeriodEnd && new Date(k) > s).map(([k]) => new Date(k)).sort((a,b)=>a-b);
+    if (ends.length > 0) {
+      sum += (ends[0] - s) / (1000*60*60*24);
+      count++;
+    }
+  });
+  return count > 0 ? Math.round(sum/count) : 5;
+}
+
+function predictNext(starts, avgCycle) {
+  if (starts.length === 0) return null;
+  const d = new Date(starts[starts.length-1]);
+  d.setDate(d.getDate() + avgCycle);
+  return d;
+}
+
+function predictOvulation(nextPeriod, lutealDays) {
+  if (!nextPeriod) return null;
+  const d = new Date(nextPeriod);
+  d.setDate(d.getDate() - lutealDays);
+  return d;
+}
+
+function ovulationWindow(ovDay) {
+  if (!ovDay) return [];
+  const w = [];
+  for (let i=-2; i<=2; i++) {
+    const d = new Date(ovDay); d.setDate(d.getDate()+i); w.push(dateKey(d));
+  }
+  return w;
+}
+
+function getPhase(periodStarts, avgPeriodDays, ovWindow, nextPeriod) {
+  const todayKey = dateKey(today);
+  for (const s of periodStarts) {
+    const end = new Date(s); end.setDate(end.getDate() + avgPeriodDays - 1);
+    if (today >= s && today <= end) return 'menstrual';
+  }
+  if (ovWindow.includes(todayKey)) return 'ovulation';
+  if (periodStarts.length > 0) {
+    const lastEnd = new Date(periodStarts[periodStarts.length-1]);
+    lastEnd.setDate(lastEnd.getDate() + avgPeriodDays);
+    if (ovWindow.length > 0) {
+      const ovStart = ovWindow[0];
+      if (today >= lastEnd && todayKey < ovStart) return 'follicular';
+      const ovEnd = ovWindow[ovWindow.length-1];
+      if (todayKey > ovEnd) return 'luteal';
+    }
+    if (today >= lastEnd) return 'follicular';
+  }
+  return 'follicular';
+}
+
+// ===== 刷新所有页面 =====
+function refreshAll() {
+  const data = getStore();
+  const starts = getPeriodStarts();
+  let avgCycle = calcAvgCycle(starts);
+  let avgPeriodDays = calcAvgPeriod(starts);
+  if (data.settings.avgCycleDays !== 28) avgCycle = data.settings.avgCycleDays;
+  if (data.settings.avgPeriodDays !== 5) avgPeriodDays = data.settings.avgPeriodDays;
+
+  const nextPeriod = predictNext(starts, avgCycle);
+  const ovDay = predictOvulation(nextPeriod, data.settings.lutealDays);
+  const ovWindow = ovulationWindow(ovDay);
+  const phase = getPhase(starts, avgPeriodDays, ovWindow, nextPeriod);
+
+  // 首页
+  const phaseInfo = PHASES[phase];
+  const lastStart = starts.length > 0 ? starts[starts.length-1] : null;
+  let dayInCycle = lastStart ? Math.floor((today - lastStart) / (1000*60*60*24)) + 1 : 0;
+  const progress = avgCycle > 0 ? Math.min(dayInCycle / avgCycle, 1) : 0;
+  const circumference = 2 * Math.PI * 88;
+  const dashOffset = circumference * (1 - progress);
+
+  document.getElementById('ring-progress').setAttribute('stroke', phaseInfo.color);
+  document.getElementById('ring-progress').setAttribute('stroke-dasharray', circumference);
+  document.getElementById('ring-progress').setAttribute('stroke-dashoffset', dashOffset);
+
+  if (phase === 'menstrual') {
+    let pd = 0;
+    if (lastStart) {
+      for (const s of starts) {
+        if (today >= s) {
+          const end = new Date(s); end.setDate(end.getDate()+avgPeriodDays-1);
+          if (today <= end) { pd = Math.floor((today-s)/(1000*60*60*24))+1; break; }
+        }
+      }
+    }
+    document.getElementById('ring-label').textContent = '经期';
+    document.getElementById('ring-day').textContent = `第${pd}天`;
+    document.getElementById('ring-total').textContent = `共${avgPeriodDays}天`;
+  } else {
+    document.getElementById('ring-label').textContent = '周期';
+    document.getElementById('ring-day').textContent = `第${dayInCycle}天`;
+    document.getElementById('ring-total').textContent = `共${avgCycle}天`;
+  }
+  document.getElementById('ring-day').style.color = phaseInfo.color;
+
+  document.getElementById('status-dot').style.background = phaseInfo.dot;
+  document.getElementById('status-phase').textContent = phaseInfo.name;
+  document.getElementById('status-phase').style.color = phaseInfo.color;
+
+  let daysUntil = nextPeriod ? Math.floor((nextPeriod - today) / (1000*60*60*24)) : null;
+  document.getElementById('days-until').textContent = daysUntil !== null ? daysUntil : '--';
+  document.getElementById('preg-prob').textContent = phaseInfo.preg;
+  document.getElementById('preg-prob').style.color = phaseInfo.preg === '高' ? '#FF8C69' : (phaseInfo.preg==='低'?'#6DD5B8':'#999');
+  if (nextPeriod) {
+    document.getElementById('next-period').textContent = `${nextPeriod.getMonth()+1}月${nextPeriod.getDate()}日`;
+  } else {
+    document.getElementById('next-period').textContent = '--';
+  }
+  document.getElementById('ovulation-info').textContent = ovDay ? `⭐ 预计排卵日：${ovDay.getMonth()+1}月${ovDay.getDate()}日` : '';
+  document.getElementById('daily-tip').textContent = phaseInfo.tip;
+
+  // 个人中心
+  document.getElementById('stat-avg-cycle').textContent = avgCycle + '天';
+  document.getElementById('stat-avg-period').textContent = avgPeriodDays + '天';
+  document.getElementById('stat-cycles').textContent = starts.length + ' 个';
+  document.getElementById('stat-avg-c').textContent = avgCycle + ' 天';
+  document.getElementById('stat-avg-p').textContent = avgPeriodDays + ' 天';
+
+  if (starts.length >= 2) {
+    let intervals = [];
+    for (let i=1; i<starts.length; i++) intervals.push(Math.round((starts[i]-starts[i-1])/(1000*60*60*24)));
+    document.getElementById('stat-min').textContent = Math.min(...intervals) + ' 天';
+    document.getElementById('stat-max').textContent = Math.max(...intervals) + ' 天';
+    const mean = intervals.reduce((a,b)=>a+b,0)/intervals.length;
+    const std = Math.sqrt(intervals.reduce((a,b)=>a+Math.pow(b-mean,2),0)/intervals.length);
+    let reg;
+    if (std <= 2) reg = '非常规律';
+    else if (std <= 5) reg = '基本规律';
+    else reg = '不太规律';
+    document.getElementById('stat-reg').textContent = reg;
+    document.getElementById('stat-regularity').textContent = reg;
+    document.getElementById('stat-regularity').style.color = std<=2?'#6DD5B8':(std<=5?'#FFB74D':'#E8537A');
+  } else {
+    document.getElementById('stat-min').textContent = '-- 天';
+    document.getElementById('stat-max').textContent = '-- 天';
+    document.getElementById('stat-reg').textContent = '暂无数据';
+    document.getElementById('stat-regularity').textContent = '暂无';
+  }
+
+  document.getElementById('profile-sub').textContent = `已记录 ${starts.length} 个周期`;
+  const nn = data.settings.nickname || '予暖用户';
+  document.getElementById('profile-name').textContent = nn;
+  document.getElementById('profile-avatar').textContent = '🐶';
+
+  // 日历
+  renderCalendar();
+
+  // 设置
+  document.getElementById('set-nickname').value = data.settings.nickname || '';
+  document.getElementById('set-cycle').value = data.settings.avgCycleDays;
+  document.getElementById('set-cycle-val').textContent = data.settings.avgCycleDays + '天';
+  document.getElementById('set-period').value = data.settings.avgPeriodDays;
+  document.getElementById('set-period-val').textContent = data.settings.avgPeriodDays + '天';
+  document.getElementById('set-mode').value = data.settings.mode || 'standard';
+}
+
+// ===== 日历渲染 =====
+function renderCalendar() {
+  const data = getStore();
+  const starts = getPeriodStarts();
+  let avgCycle = data.settings.avgCycleDays;
+  if (avgCycle === 28) avgCycle = calcAvgCycle(starts);
+  let avgPeriodDays = data.settings.avgPeriodDays;
+  if (avgPeriodDays === 5) avgPeriodDays = calcAvgPeriod(starts);
+  const nextPeriod = predictNext(starts, avgCycle);
+  const ovWindow = ovulationWindow(predictOvulation(nextPeriod, data.settings.lutealDays));
+
+  // 经期日期集
+  const periodSet = new Set();
+  starts.forEach(s => {
+    const ends = Object.entries(data.records).filter(([k,r]) => r.isPeriodEnd && new Date(k) > s).map(([k]) => new Date(k)).sort((a,b)=>a-b);
+    let len = avgPeriodDays;
+    if (ends.length > 0) len = Math.round((ends[0]-s)/(1000*60*60*24));
+    for (let i=0; i<Math.max(len,1); i++) {
+      const d = new Date(s); d.setDate(d.getDate()+i);
+      periodSet.add(dateKey(d));
+    }
+  });
+
+  // 预测经期
+  const predictedSet = new Set();
+  if (nextPeriod) {
+    for (let i=0; i<avgPeriodDays; i++) {
+      const d = new Date(nextPeriod); d.setDate(d.getDate()+i);
+      predictedSet.add(dateKey(d));
+    }
+  }
+
+  document.getElementById('cal-month').textContent = `${calYear}年${calMonth+1}月`;
+
+  const firstDay = new Date(calYear, calMonth, 1);
+  const lastDay = new Date(calYear, calMonth+1, 0);
+  const startDow = firstDay.getDay();
+  const totalDays = lastDay.getDate();
+
+  let html = '';
+  // 前月填充
+  const prevLast = new Date(calYear, calMonth, 0).getDate();
+  for (let i = startDow - 1; i >= 0; i--) {
+    html += `<div class="cal-cell other-month">${prevLast - i}</div>`;
+  }
+  // 当月
+  for (let d = 1; d <= totalDays; d++) {
+    const date = new Date(calYear, calMonth, d);
+    const key = dateKey(date);
+    let cls = 'cal-cell';
+    if (key === dateKey(today)) cls += ' today';
+    else if (periodSet.has(key)) cls += ' period';
+    else if (predictedSet.has(key)) cls += ' predicted';
+    else if (ovWindow.includes(key)) cls += ' ovulation';
+    html += `<div class="${cls}" onclick="openRecordForDate('${key}')">${d}</div>`;
+  }
+  // 后月填充
+  const totalCells = startDow + totalDays;
+  const remaining = totalCells <= 35 ? 35 - totalCells : 42 - totalCells;
+  for (let d = 1; d <= remaining; d++) {
+    html += `<div class="cal-cell other-month">${d}</div>`;
+  }
+
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+function prevMonth() {
+  calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+function nextMonth() {
+  calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+}
+
+// ===== Tab 切换 =====
+function switchTab(idx) {
+  currentTab = idx;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + ['dashboard','calendar','record','profile'][idx]).classList.add('active');
+  document.getElementById('tab-' + idx).classList.add('active');
+  if (idx === 0 || idx === 3) refreshAll();
+  if (idx === 1) renderCalendar();
+}
+
+// ===== 记录页面 =====
+function openRecord() {
+  recordDate = new Date();
+  loadRecordForDate(recordDate);
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-record').classList.add('active');
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+}
+function openRecordForDate(key) {
+  recordDate = new Date(key + 'T00:00:00');
+  loadRecordForDate(recordDate);
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-record').classList.add('active');
+}
+
+function loadRecordForDate(date) {
+  const key = dateKey(date);
+  document.getElementById('record-date-title').textContent = `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日`;
+  const wds = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  document.getElementById('record-weekday').textContent = wds[date.getDay()];
+
+  const data = getStore();
+  const r = data.records[key] || {};
+
+  document.getElementById('period-start-toggle').classList.toggle('on', !!r.isPeriodStart);
+  document.getElementById('period-end-toggle').classList.toggle('on', !!r.isPeriodEnd);
+  document.getElementById('sex-toggle').classList.toggle('on', !!r.hadSex);
+  document.getElementById('record-note').value = r.note || '';
+
+  // 经血量
+  document.querySelectorAll('.flow-btn').forEach(b => b.classList.remove('selected'));
+  if (r.flowLevel !== undefined) {
+    document.querySelector(`.flow-btn[data-flow="${r.flowLevel}"]`)?.classList.add('selected');
+  }
+
+  // 症状
+  document.querySelectorAll('#symptom-tags .tag-btn').forEach(b => b.classList.remove('selected'));
+  (r.symptoms || []).forEach(sid => {
+    document.querySelector(`#symptom-tags .tag-btn[data-id="${sid}"]`)?.classList.add('selected');
+  });
+
+  // 情绪
+  document.querySelectorAll('#mood-picker .mood-btn').forEach(b => b.classList.remove('selected'));
+  if (r.mood) {
+    document.querySelector(`#mood-picker .mood-btn[data-id="${r.mood}"]`)?.classList.add('selected');
+  }
+}
+
+function toggleSwitch(el) {
+  el.classList.toggle('on');
+}
+
+function selectFlow(el) {
+  document.querySelectorAll('.flow-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function saveRecord() {
+  const data = getStore();
+  const key = dateKey(recordDate);
+  const symptoms = [];
+  document.querySelectorAll('#symptom-tags .tag-btn.selected').forEach(b => symptoms.push(b.dataset.id));
+  const moodBtn = document.querySelector('#mood-picker .mood-btn.selected');
+  const flowBtn = document.querySelector('.flow-btn.selected');
+
+  data.records[key] = {
+    isPeriodStart: document.getElementById('period-start-toggle').classList.contains('on'),
+    isPeriodEnd: document.getElementById('period-end-toggle').classList.contains('on'),
+    flowLevel: flowBtn ? parseInt(flowBtn.dataset.flow) : undefined,
+    symptoms: symptoms,
+    mood: moodBtn ? moodBtn.dataset.id : undefined,
+    hadSex: document.getElementById('sex-toggle').classList.contains('on'),
+    note: document.getElementById('record-note').value
+  };
+  setStore(data);
+
+  showToast();
+  setTimeout(() => { switchTab(0); }, 1000);
+}
+
+function clearRecord() {
+  document.getElementById('period-start-toggle').classList.remove('on');
+  document.getElementById('period-end-toggle').classList.remove('on');
+  document.getElementById('sex-toggle').classList.remove('on');
+  document.getElementById('record-note').value = '';
+  document.querySelectorAll('.flow-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('#symptom-tags .tag-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('#mood-picker .mood-btn').forEach(b => b.classList.remove('selected'));
+}
+
+function showToast() {
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1200);
+}
+
+// ===== 设置 =====
+function openSettings() {
+  const data = getStore();
+  document.getElementById('set-nickname').value = data.settings.nickname || '';
+  document.getElementById('set-cycle').value = data.settings.avgCycleDays;
+  document.getElementById('set-cycle-val').textContent = data.settings.avgCycleDays + '天';
+  document.getElementById('set-period').value = data.settings.avgPeriodDays;
+  document.getElementById('set-period-val').textContent = data.settings.avgPeriodDays + '天';
+  document.getElementById('set-mode').value = data.settings.mode || 'standard';
+  refreshAll();
+  document.getElementById('settings-panel').classList.add('active');
+}
+function closeSettings() {
+  document.getElementById('settings-panel').classList.remove('active');
+}
+function updateSlider(slider, valId) {
+  document.getElementById(valId).textContent = slider.value + '天';
+}
+function saveSettings() {
+  const data = getStore();
+  data.settings.avgCycleDays = parseInt(document.getElementById('set-cycle').value);
+  data.settings.avgPeriodDays = parseInt(document.getElementById('set-period').value);
+  data.settings.nickname = document.getElementById('set-nickname').value;
+  data.settings.mode = document.getElementById('set-mode').value;
+  setStore(data);
+  refreshAll();
+  closeSettings();
+}
+
+// ===== 关于弹窗 =====
+function showAbout() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:300;display:flex;align-items:center;justify-content:center;';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  const card = document.createElement('div');
+  card.style.cssText = 'background:white;border-radius:20px;padding:28px 24px;margin:0 32px;text-align:center;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.15);';
+  card.innerHTML = `
+    <div style="font-size:48px;margin-bottom:12px">🐶</div>
+    <h3 style="font-size:18px;margin-bottom:8px;color:#333">予暖</h3>
+    <p style="font-size:14px;color:#999;margin-bottom:16px;line-height:1.8">人海相遇，何其有幸，得你为妻，胜世间万种风情。</p>
+    <p style="font-size:12px;color:#ccc">v1.0.0 · 少爷和你一起在乎你 ❤️</p>
+    <button style="margin-top:16px;padding:10px 40px;border:none;border-radius:20px;background:#E8537A;color:white;font-size:14px;cursor:pointer">知道了</button>
+  `;
+  card.querySelector('button').onclick = () => overlay.remove();
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+}
+
+// ===== Service Worker =====
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+
+// ===== 启动 =====
+init();
+refreshAll();
+</script>
+</body>
+</html>
